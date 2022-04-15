@@ -16,9 +16,8 @@ class User extends BaseController
       $this -> business = new Business();
     }
 
-    public function register()
+    public function login()
     {
-      trace('错误信息', 'error');
       $data['username'] = $this -> request -> param("username", '', 'htmlspecialchars');
       $data['password'] = $this -> request -> param("password", '', 'htmlspecialchars');
 
@@ -28,12 +27,23 @@ class User extends BaseController
         return $this ->fail($exception -> getMessage()); 
       }
 
-      
-      // Log::log('info',"aaaaaaaaaaaaaa");
-      Log::write('测试日志信息，这是警告级别，并且实时写入','notice');
+      $errCode = $this ->business ->login($data);
+      return $this -> success($errCode);
+    }
+
+    public function register()
+    {
+      $data['username'] = $this -> request -> param("username", '', 'htmlspecialchars');
+      $data['password'] = $this -> request -> param("password", '', 'htmlspecialchars');
+
+      try {
+        validate(Validate::class) -> scene("login_register") -> check($data);
+      } catch (\Exception $exception) {
+        return $this ->fail($exception -> getMessage()); 
+      }
+
       $this ->business ->register($data);
       return $this -> success("注册成功！");
-
     }
 
 }

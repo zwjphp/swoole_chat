@@ -1,5 +1,7 @@
 <?php
 namespace app\common\business\api;
+
+use app\common\business\lib\Redis;
 use app\common\model\api\User as UserModel;
 use app\common\business\lib\Str;
 use Exception;
@@ -9,17 +11,42 @@ class User
 {
   private $userModel = NULL;
   private $str = NULL;
+  private $redis = NULL;
 
   public function __construct(){
     $this -> userModel = new UserModel();
-    $this -> str = new Str();
+    $this -> str   = new Str();
+    $this -> redis = new Redis();
+  }
+
+  public function login($data) {
+    $isExist = $this -> userModel -> findByUserNameWithStatus($data['username']);
+    if (empty($isExist)) {
+      throw new Exception("用户名不存在！");
+    }
+
+    $password = md5($isExist['password_salt'] . $data['password'] . $isExist['password_salt']);
+    if ($password != $isExist['password']) {
+      throw new Exception('密码错误！');
+    }
+
+    $this -> redis -> delete(config('redis.token_pre'). $isExist['last_login_token']);
+    $token = $this -> str -> createToken($isExist['username']);
+    $this -> userModel -> updateLoginInfo([
+      'username' => $isExist['username'],
+      'last_login_token' => $token
+    ]);
+
+    $this -> redis -> set(config('redis.token_pre') . $token, [
+      'id' => $isExist['id'],
+      'username' => $isExist['username']
+    ]);
+
+    return $token;
   }
 
   public function register($data) {
-    Log::write('测试日志信息，这是警告级别，并且实时写入','error');
-    Log::record('测试日志信息','info');
     $isExist = $this -> userModel -> findByUserName($data['username']);
-    Log::record($isExist,'info');
     if (!empty($isExist)) {
       throw new Exception("用户名已经被注册！");
     }
@@ -28,7 +55,6 @@ class User
     $data['password'] = md5($data['password_salt'].$data['password'].$data['password_salt']);
   
     $this -> userModel -> save($data);
-  
   }
 
 }
